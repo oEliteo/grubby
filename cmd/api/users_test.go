@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"grubby/internal/auth"
 	"grubby/internal/database"
 	"grubby/internal/logging"
@@ -74,8 +75,73 @@ func TestHandleUserCreate(t *testing.T) {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
 
-	resetTestDB(t, db)
+	defer resetTestDB(t, db)
 
+	createNewUser(t, db, cfg)
+}
+
+func TestHandleGetUserByIDPublic(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	defer resetTestDB(t, db)
+
+	newUsr := createNewUser(t, db, cfg)
+
+	fmt.Printf("%s | %s ", newUsr.ID, newUsr.DisplayName)
+
+	data, err := json.Marshal(newUsr)
+	if err != nil {
+		t.Fatalf("error marshalling json payload: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+
+	request := httptest.NewRequest(http.MethodGet, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserGetByIDPublic(rr, request)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected %d got %d", http.StatusOK, rr.Code)
+	}
+
+	returnedUsr := UserPublic{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &returnedUsr); err != nil {
+		t.Fatalf("unable to unmasrhal returned user: %v\n", err)
+	}
+
+	if returnedUsr.ID != newUsr.ID {
+		t.Fatalf("expected %v got %v", newUsr.ID, returnedUsr.ID)
+	}
+
+	if returnedUsr.DisplayName != newUsr.DisplayName {
+		t.Fatalf("expected %v got %v", newUsr.DisplayName, returnedUsr.DisplayName)
+	}
+}
+
+func resetTestDB(t *testing.T, db *sql.DB) {
+	t.Helper()
+
+	_, err := db.Exec("TRUNCATE TABLE users CASCADE;")
+	if err != nil {
+		t.Fatalf("failed to reset test database: %v\n", err)
+	}
+}
+
+func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) UserPrivate {
+	t.Helper()
+
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	_ = db
 	usrArgs := UserArgs{
 		Email:       "johnsmith@test.com",
 		DisplayName: "john_smith07",
@@ -125,13 +191,6 @@ func TestHandleUserCreate(t *testing.T) {
 	if !ok || err != nil {
 		t.Fatalf("password hash invalid or error expected: true got: %v\nerror: %v\n", ok, err)
 	}
-}
 
-func resetTestDB(t *testing.T, db *sql.DB) {
-	t.Helper()
-
-	_, err := db.Exec("TRUNCATE TABLE users CASCADE;")
-	if err != nil {
-		t.Fatalf("failed to reset test database: %v\n", err)
-	}
+	return usrPrivate
 }
