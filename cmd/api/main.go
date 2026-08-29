@@ -19,6 +19,7 @@ type apiConfig struct {
 	jwtSecret string
 	port      string
 	amqp      *amqp.Connection
+	log       *slog.Logger
 }
 
 func main() {
@@ -56,13 +57,12 @@ func main() {
 		jwtSecret: secret,
 		port:      port,
 		amqp:      amqpConn,
+		log:       log,
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
+	mux.HandleFunc("GET /health", cfg.handleCheckHealth)
+	mux.HandleFunc("POST /api/users", cfg.handleUserCreate)
 
 	loggedMux := middleware.RequestLogger(log)(mux)
 
