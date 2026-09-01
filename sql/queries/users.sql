@@ -17,8 +17,7 @@ SELECT * FROM users
 WHERE email = $1;
 
 -- name: GetUserByID :one
-SELECT id, created_at, updated_at, email, display_name, is_premium
-FROM users
+SELECT * FROM users
 WHERE id = $1;
 
 -- name: UpdateUserPartial :one
