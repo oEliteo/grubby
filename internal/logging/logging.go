@@ -32,8 +32,8 @@ func (h *PrettyLogsHandler) Handle(_ context.Context, r slog.Record) error {
 
 	switch r.Message {
 	case "HTTP REQUEST":
-		header := fmt.Sprintf("%-10s %-15s %-8s %-25s %-8s %-12s %s", "TIME", "MESSAGE", "METHOD", "PATH", "STATUS", "DURATION", "IP")
-		values := fmt.Sprintf("%-10s %-15v %-8v %-25v %-8v %-12v %v",
+		header := fmt.Sprintf("%-10s %-15s %-8s %-50s %-8s %-12s %s", "TIME", "MESSAGE", "METHOD", "PATH", "STATUS", "DURATION", "IP")
+		values := fmt.Sprintf("%-10s %-15v %-8v %-50v %-8v %-12v %v",
 			timeStr,
 			r.Message,
 			attrs["method"],

@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -123,37 +124,91 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow
 	return i, err
 }
 
-const updateUser = `-- name: UpdateUser :one
+const updateUserFull = `-- name: UpdateUserFull :one
 UPDATE users
 SET display_name = $1,
    email = $2,
+   hashed_password = $3,
    updated_at = NOW()
-WHERE id = $3
-RETURNING id, created_at, updated_at, display_name, is_premium
+WHERE id = $4
+RETURNING id, created_at, updated_at, display_name, email, is_premium
 `
 
-type UpdateUserParams struct {
-	DisplayName string
-	Email       string
-	ID          uuid.UUID
+type UpdateUserFullParams struct {
+	DisplayName    string
+	Email          string
+	HashedPassword string
+	ID             uuid.UUID
 }
 
-type UpdateUserRow struct {
+type UpdateUserFullRow struct {
 	ID          uuid.UUID
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DisplayName string
+	Email       string
 	IsPremium   bool
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (UpdateUserRow, error) {
-	row := q.db.QueryRowContext(ctx, updateUser, arg.DisplayName, arg.Email, arg.ID)
-	var i UpdateUserRow
+func (q *Queries) UpdateUserFull(ctx context.Context, arg UpdateUserFullParams) (UpdateUserFullRow, error) {
+	row := q.db.QueryRowContext(ctx, updateUserFull,
+		arg.DisplayName,
+		arg.Email,
+		arg.HashedPassword,
+		arg.ID,
+	)
+	var i UpdateUserFullRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DisplayName,
+		&i.Email,
+		&i.IsPremium,
+	)
+	return i, err
+}
+
+const updateUserPartial = `-- name: UpdateUserPartial :one
+UPDATE users
+SET display_name = COALESCE($1, display_name),
+   email = COALESCE($2, email),
+   hashed_password = COALESCE($3, hashed_password),
+   updated_at = NOW()
+WHERE id = $4
+RETURNING id, created_at, updated_at, display_name, email, is_premium
+`
+
+type UpdateUserPartialParams struct {
+	DisplayName    sql.NullString
+	Email          sql.NullString
+	HashedPassword sql.NullString
+	ID             uuid.UUID
+}
+
+type UpdateUserPartialRow struct {
+	ID          uuid.UUID
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DisplayName string
+	Email       string
+	IsPremium   bool
+}
+
+func (q *Queries) UpdateUserPartial(ctx context.Context, arg UpdateUserPartialParams) (UpdateUserPartialRow, error) {
+	row := q.db.QueryRowContext(ctx, updateUserPartial,
+		arg.DisplayName,
+		arg.Email,
+		arg.HashedPassword,
+		arg.ID,
+	)
+	var i UpdateUserPartialRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DisplayName,
+		&i.Email,
 		&i.IsPremium,
 	)
 	return i, err

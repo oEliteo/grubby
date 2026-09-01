@@ -51,6 +51,8 @@ func main() {
 
 	dbQueries := database.New(db)
 
+	//Initialize application state.
+
 	cfg := &apiConfig{
 		db:        dbQueries,
 		platform:  platform,
@@ -60,14 +62,22 @@ func main() {
 		log:       log,
 	}
 
+	//Initialize HTTP routes to handler functions.
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", cfg.handleCheckHealth)
 	mux.HandleFunc("POST /api/users", cfg.handleUserCreate)
+	mux.HandleFunc("GET /api/users/{userID}", cfg.handleUserGetByIDPublic)
+	mux.HandleFunc("POST /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdateFull))
+	mux.HandleFunc("PATCH /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdatePartial))
 
+	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)
 
+	//Log server start.
 	log.Info("HTTP Server Starting...")
 
+	//Listen and serve on port listed in .env
 	if err := http.ListenAndServe(cfg.port, loggedMux); err != nil {
 		log.Error("server failed", slog.String("error", err.Error()))
 	}

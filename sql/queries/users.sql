@@ -21,13 +21,23 @@ SELECT id, created_at, updated_at, email, display_name, is_premium
 FROM users
 WHERE id = $1;
 
--- name: UpdateUser :one
+-- name: UpdateUserPartial :one
+UPDATE users
+SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
+   email = COALESCE(sqlc.narg('email'), email),
+   hashed_password = COALESCE(sqlc.narg('hashed_password'), hashed_password),
+   updated_at = NOW()
+WHERE id = sqlc.arg('id')
+RETURNING id, created_at, updated_at, display_name, email, is_premium;
+
+-- name: UpdateUserFull :one
 UPDATE users
 SET display_name = $1,
    email = $2,
+   hashed_password = $3,
    updated_at = NOW()
-WHERE id = $3
-RETURNING id, created_at, updated_at, display_name, is_premium;
+WHERE id = $4
+RETURNING id, created_at, updated_at, display_name, email, is_premium;
 
 -- name: DeleteUser :exec
 DELETE FROM users
