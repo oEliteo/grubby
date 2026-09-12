@@ -122,6 +122,455 @@ func TestHandleGetUserByIDPublic(t *testing.T) {
 	}
 }
 
+func TestHandleUserUpdateFullBadRequest(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	type badStruct struct {
+		Payload string    `json:"payload"`
+		Array   *[]string `json:"array"`
+	}
+
+	tmp := make([]string, 3)
+	tmp[0] = "something"
+	tmp[1] = "bad"
+	tmp[2] = "2"
+
+	updateUsr := badStruct{
+		Payload: "something bad",
+		Array:   &tmp,
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", dbUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullMalformedUUIDInContext(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "noobmail@test.com",
+		DisplayName: "noobname07",
+		Password:    "noobpass123!",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, "not a uuid")
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", dbUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusUnauthorized != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusUnauthorized, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullForbidden(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "noobmail@test.com",
+		DisplayName: "noobname07",
+		Password:    "noobpass123!",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, uuid.New())
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", dbUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusForbidden != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusForbidden, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullMalformedUUIDInPath(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "noobmail@test.com",
+		DisplayName: "",
+		Password:    "noobpass123!",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", "Not a UUID")
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullAllButDisplayName(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "noobmail@test.com",
+		DisplayName: "",
+		Password:    "noobpass123!",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullOnlyPassword(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "",
+		DisplayName: "",
+		Password:    "noobpass123",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullOnlyDisplayName(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "",
+		DisplayName: "noobguy777",
+		Password:    "",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullOnlyEmail(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "noobmail@test.com",
+		DisplayName: "",
+		Password:    "",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullAllButEmail(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "",
+		DisplayName: "noobname07",
+		Password:    "noobpass123!",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullAllButPassword(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "noobmail@test.com",
+		DisplayName: "noobname07",
+		Password:    "",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
+func TestHandleUserUpdateFullNoCredentials(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "",
+		DisplayName: "",
+		Password:    "",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
 func TestHandleUserUpdateFull(t *testing.T) {
 	cfg, db, err := newTestConfig()
 	if err != nil {
