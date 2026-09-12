@@ -64,6 +64,12 @@ func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := usrArgs.Validate(); err != nil {
+		cfg.log.Info("error missing required fields", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
 	hash, err := auth.HashPassword(usrArgs.Password)
 	if err != nil {
 		cfg.log.Warn("error hashing new user's password", slog.String("error", err.Error()))

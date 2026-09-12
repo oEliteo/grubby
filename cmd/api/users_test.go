@@ -642,6 +642,37 @@ func resetTestDB(t *testing.T, db *sql.DB) {
 	}
 }
 
+func TestHandleUserCreateMissingField1(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	_ = db
+	usrArgs := UserArgs{
+		Email:       "",
+		DisplayName: "john_smith07",
+		Password:    "easy123!",
+	}
+
+	data, err := json.Marshal(usrArgs)
+	if err != nil {
+		t.Fatalf("error marshalling json payload: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserCreate(rr, request)
+
+	if http.StatusBadRequest != rr.Code {
+		t.Fatalf("expected %v got %v", http.StatusBadRequest, rr.Code)
+	}
+}
+
 func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) UserPrivate {
 	t.Helper()
 
