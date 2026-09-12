@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"grubby/internal/auth"
 	"grubby/internal/database"
 	"grubby/internal/logging"
@@ -90,8 +90,6 @@ func TestHandleGetUserByIDPublic(t *testing.T) {
 
 	newUsr := createNewUser(t, db, cfg)
 
-	fmt.Printf("%s | %s ", newUsr.ID, newUsr.DisplayName)
-
 	data, err := json.Marshal(newUsr)
 	if err != nil {
 		t.Fatalf("error marshalling json payload: %v\n", err)
@@ -121,6 +119,68 @@ func TestHandleGetUserByIDPublic(t *testing.T) {
 
 	if returnedUsr.DisplayName != newUsr.DisplayName {
 		t.Fatalf("expected %v got %v", newUsr.DisplayName, returnedUsr.DisplayName)
+	}
+}
+
+func TestHandleUserUpdateFull(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+
+	defer resetTestDB(t, db)
+
+	updateUsr := UserArgs{
+		Email:       "newtest@gmail.com",
+		DisplayName: "newtest_guy07",
+		Password:    "newtestpass123!",
+	}
+
+	data, err := json.Marshal(updateUsr)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving user from database: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	ctx := context.WithValue(context.Background(), userIDKey, dbUsr.ID)
+	request := httptest.NewRequestWithContext(ctx, http.MethodPost, "/api/users", reader)
+	request.SetPathValue("userID", newUsr.ID.String())
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserUpdateFull(rr, request)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
+	}
+
+	updatedUsr := UserPrivate{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &updatedUsr); err != nil {
+		t.Fatalf("error unmarshalling response body: %v\n", err)
+	}
+
+	if updatedUsr.ID != dbUsr.ID {
+		t.Fatalf("expected %v got %v", updatedUsr.ID, dbUsr.ID)
+	}
+
+	if updatedUsr.DisplayName == dbUsr.DisplayName {
+		t.Fatalf("did not expect %v got %v", updatedUsr.DisplayName, dbUsr.DisplayName)
+	}
+
+	dbUsrNew, err := cfg.db.GetUserByID(context.Background(), dbUsr.ID)
+	if err != nil {
+		t.Fatalf("error retrieving updated user from database: %v\n", err)
+	}
+
+	if dbUsrNew.HashedPassword == dbUsr.HashedPassword {
+		t.Fatalf("did not expect %v got %v", dbUsrNew.HashedPassword, dbUsr.HashedPassword)
 	}
 }
 
