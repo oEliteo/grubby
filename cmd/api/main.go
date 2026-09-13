@@ -77,7 +77,7 @@ func main() {
 	//Log server start.
 	log.Info("HTTP Server Starting...")
 
-	//Listen and serve on port listed in .env
+	//Listen and Serve with wrapped multiplexer and port.
 	if err := http.ListenAndServe(cfg.port, loggedMux); err != nil {
 		log.Error("server failed", slog.String("error", err.Error()))
 	}
