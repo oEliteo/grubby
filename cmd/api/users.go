@@ -29,9 +29,9 @@ func (u UserArgs) Validate() error {
 }
 
 type UserArgsPartial struct {
-	Email       *string `json:"email"`
-	DisplayName *string `json:"display_name"`
-	Password    *string `json:"password"`
+	Email       *string `json:"email,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Password    *string `json:"password,omitempty"`
 }
 
 func nullStringFromPtr(s *string) sql.NullString {
@@ -42,12 +42,14 @@ func nullStringFromPtr(s *string) sql.NullString {
 }
 
 type UserPrivate struct {
-	ID          uuid.UUID `json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Email       string    `json:"email"`
-	DisplayName string    `json:"display_name"`
-	IsPremium   bool      `json:"is_premium"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	DisplayName  string    `json:"display_name"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
+	IsPremium    bool      `json:"is_premium"`
 }
 
 type UserPublic struct {
@@ -92,13 +94,39 @@ func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	jwt, err := auth.MakeJWT(dbUsr.ID, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		cfg.log.Warn("error creating json web token for new user", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	refreshToken := auth.MakeRefreshToken()
+	refreshExpiry := time.Now().AddDate(0, 0, 60)
+
+	dbRefreshTokenArgs := database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    dbUsr.ID,
+		ExpiresAt: refreshExpiry,
+		RevokedAt: sql.NullTime{},
+	}
+
+	dbRefreshToken, err := cfg.db.CreateRefreshToken(r.Context(), dbRefreshTokenArgs)
+	if err != nil {
+		cfg.log.Warn("error creating refresh token for new user", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
 	usrPrivate := UserPrivate{
-		ID:          dbUsr.ID,
-		CreatedAt:   dbUsr.CreatedAt,
-		UpdatedAt:   dbUsr.UpdatedAt,
-		DisplayName: dbUsr.DisplayName,
-		Email:       dbUsr.Email,
-		IsPremium:   dbUsr.IsPremium,
+		ID:           dbUsr.ID,
+		CreatedAt:    dbUsr.CreatedAt,
+		UpdatedAt:    dbUsr.UpdatedAt,
+		DisplayName:  dbUsr.DisplayName,
+		Email:        dbUsr.Email,
+		Token:        jwt,
+		RefreshToken: dbRefreshToken.Token,
+		IsPremium:    dbUsr.IsPremium,
 	}
 
 	cfg.respondWithJSON(w, http.StatusCreated, usrPrivate)
@@ -241,17 +269,18 @@ func (cfg *apiConfig) handleUserUpdatePartial(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var nullStrPassword sql.NullString
+	var nullStrHash sql.NullString
+	nullStrPassword := nullStringFromPtr(params.Password)
 	nullStrDisplayName := nullStringFromPtr(params.DisplayName)
 	nullStrEmail := nullStringFromPtr(params.Email)
-	if params.Password != nil {
-		hashedPassword, err := auth.HashPassword(*params.Password)
+	if nullStrPassword.Valid {
+		hashedPassword, err := auth.HashPassword(nullStrPassword.String)
 		if err != nil {
 			cfg.log.Info("error hashing provided password", slog.String("error", err.Error()))
 			cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
-		nullStrPassword = sql.NullString{
+		nullStrHash = sql.NullString{
 			String: hashedPassword,
 			Valid:  true,
 		}
@@ -261,7 +290,7 @@ func (cfg *apiConfig) handleUserUpdatePartial(w http.ResponseWriter, r *http.Req
 		ID:             targetUserID,
 		DisplayName:    nullStrDisplayName,
 		Email:          nullStrEmail,
-		HashedPassword: nullStrPassword,
+		HashedPassword: nullStrHash,
 	}
 
 	dbUsr, err := cfg.db.UpdateUserPartial(r.Context(), usrUpdateArgs)
@@ -281,4 +310,35 @@ func (cfg *apiConfig) handleUserUpdatePartial(w http.ResponseWriter, r *http.Req
 	}
 
 	cfg.respondWithJSON(w, http.StatusOK, usrResponsePrivate)
+}
+
+func (cfg *apiConfig) handleUserDelete(w http.ResponseWriter, r *http.Request) {
+	targetUserID, err := uuid.Parse(r.PathValue("userID"))
+	if err != nil {
+		cfg.log.Info("malformed uuid parsed from path", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	authUserID, ok := r.Context().Value(userIDKey).(uuid.UUID)
+	if !ok {
+		cfg.log.Info("userID in context is not a uuid")
+		cfg.respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if authUserID != targetUserID {
+		cfg.log.Info("current user is not the owner of the resource")
+		cfg.respondWithError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	err = cfg.db.DeleteUser(r.Context(), targetUserID)
+	if err != nil {
+		cfg.log.Info("unable to delete specified user", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

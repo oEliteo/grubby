@@ -66,10 +66,13 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", cfg.handleCheckHealth)
+
+	// User Create, Read, Update, Delete Routes + Methods
 	mux.HandleFunc("POST /api/users", cfg.handleUserCreate)
 	mux.HandleFunc("GET /api/users/{userID}", cfg.handleUserGetByIDPublic)
 	mux.HandleFunc("POST /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdateFull))
 	mux.HandleFunc("PATCH /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdatePartial))
+	mux.HandleFunc("DELETE /api/users/{userID}", cfg.Authenticate(cfg.handleUserDelete))
 
 	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)
