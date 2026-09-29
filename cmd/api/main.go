@@ -73,6 +73,7 @@ func main() {
 	mux.HandleFunc("POST /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdateFull))
 	mux.HandleFunc("PATCH /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdatePartial))
 	mux.HandleFunc("DELETE /api/users/{userID}", cfg.Authenticate(cfg.handleUserDelete))
+	mux.HandleFunc("POST /api/login", cfg.handleUserLogin)
 
 	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)

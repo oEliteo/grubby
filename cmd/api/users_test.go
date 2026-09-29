@@ -99,7 +99,7 @@ func TestHandleGetUserByIDPublic(t *testing.T) {
 	reader := bytes.NewReader(data)
 
 	request := httptest.NewRequest(http.MethodGet, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 
 	rr := httptest.NewRecorder()
 
@@ -114,12 +114,12 @@ func TestHandleGetUserByIDPublic(t *testing.T) {
 		t.Fatalf("unable to unmasrhal returned user: %v\n", err)
 	}
 
-	if returnedUsr.ID != newUsr.ID {
-		t.Fatalf("expected %v got %v", newUsr.ID, returnedUsr.ID)
+	if returnedUsr.ID != newUsr.UserResponse.ID {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.ID, returnedUsr.ID)
 	}
 
-	if returnedUsr.DisplayName != newUsr.DisplayName {
-		t.Fatalf("expected %v got %v", newUsr.DisplayName, returnedUsr.DisplayName)
+	if returnedUsr.DisplayName != newUsr.UserResponse.DisplayName {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.DisplayName, returnedUsr.DisplayName)
 	}
 }
 
@@ -153,7 +153,7 @@ func TestHandleUserUpdateFullBadRequest(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
@@ -193,7 +193,7 @@ func TestHandleUserUpdateFullMalformedUUIDInContext(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
@@ -235,7 +235,7 @@ func TestHandleUserUpdateFullForbidden(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
@@ -317,7 +317,7 @@ func TestHandleUserUpdateFullAllButDisplayName(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 	rr := httptest.NewRecorder()
 
@@ -352,7 +352,7 @@ func TestHandleUserUpdateFullOnlyPassword(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -388,7 +388,7 @@ func TestHandleUserUpdateFullOnlyDisplayName(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -424,7 +424,7 @@ func TestHandleUserUpdateFullOnlyEmail(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 	rr := httptest.NewRecorder()
 
@@ -459,7 +459,7 @@ func TestHandleUserUpdateFullAllButEmail(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -495,7 +495,7 @@ func TestHandleUserUpdateFullAllButPassword(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -531,7 +531,7 @@ func TestHandleUserUpdateFullNoCredentials(t *testing.T) {
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 	rr := httptest.NewRecorder()
 
@@ -564,14 +564,14 @@ func TestHandleUserUpdateFull(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -584,7 +584,7 @@ func TestHandleUserUpdateFull(t *testing.T) {
 		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
 	}
 
-	updatedUsr := UserPrivate{}
+	updatedUsr := UserResponse{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &updatedUsr); err != nil {
 		t.Fatalf("error unmarshalling response body: %v\n", err)
 	}
@@ -634,14 +634,14 @@ func TestHandleUserUpdatePartialPasswordOnly(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPatch, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -654,21 +654,21 @@ func TestHandleUserUpdatePartialPasswordOnly(t *testing.T) {
 		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
 	}
 
-	updatedUsr := UserPrivate{}
+	updatedUsr := UserResponse{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &updatedUsr); err != nil {
 		t.Fatalf("error unmarshalling response body: %v\n", err)
 	}
 
-	if updatedUsr.ID != newUsr.ID {
-		t.Fatalf("expected %v got %v", newUsr.ID, updatedUsr.ID)
+	if updatedUsr.ID != newUsr.UserResponse.ID {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.ID, updatedUsr.ID)
 	}
 
-	if updatedUsr.Email != newUsr.Email {
-		t.Fatalf("expected %v got %v", newUsr.Email, updatedUsr.Email)
+	if updatedUsr.Email != newUsr.UserResponse.Email {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.Email, updatedUsr.Email)
 	}
 
-	if updatedUsr.DisplayName != newUsr.DisplayName {
-		t.Fatalf("expected %v got %v", newUsr.DisplayName, updatedUsr.DisplayName)
+	if updatedUsr.DisplayName != newUsr.UserResponse.DisplayName {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.DisplayName, updatedUsr.DisplayName)
 	}
 
 	dbUsrNew, err := cfg.db.GetUserByID(context.Background(), dbUsr.ID)
@@ -709,14 +709,14 @@ func TestHandleUserUpdatePartialMultiValue(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPatch, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -729,13 +729,13 @@ func TestHandleUserUpdatePartialMultiValue(t *testing.T) {
 		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
 	}
 
-	updatedUsr := UserPrivate{}
+	updatedUsr := UserResponse{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &updatedUsr); err != nil {
 		t.Fatalf("error unmarshalling response body: %v\n", err)
 	}
 
-	if updatedUsr.ID != newUsr.ID {
-		t.Fatalf("expected %v got %v", newUsr.ID, updatedUsr.ID)
+	if updatedUsr.ID != newUsr.UserResponse.ID {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.ID, updatedUsr.ID)
 	}
 
 	if updatedUsr.Email != *updateUsr.Email {
@@ -783,14 +783,14 @@ func TestHandleUserUpdatePartialEmailOnly(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPatch, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -803,21 +803,21 @@ func TestHandleUserUpdatePartialEmailOnly(t *testing.T) {
 		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
 	}
 
-	updatedUsr := UserPrivate{}
+	updatedUsr := UserResponse{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &updatedUsr); err != nil {
 		t.Fatalf("error unmarshalling response body: %v\n", err)
 	}
 
-	if updatedUsr.ID != newUsr.ID {
-		t.Fatalf("expected %v got %v", newUsr.ID, updatedUsr.ID)
+	if updatedUsr.ID != newUsr.UserResponse.ID {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.ID, updatedUsr.ID)
 	}
 
 	if updatedUsr.Email != *updateUsr.Email {
 		t.Fatalf("expected %v got %v", *updateUsr.Email, updatedUsr.Email)
 	}
 
-	if updatedUsr.DisplayName != newUsr.DisplayName {
-		t.Fatalf("expected %v got %v", newUsr.DisplayName, updatedUsr.DisplayName)
+	if updatedUsr.DisplayName != newUsr.UserResponse.DisplayName {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.DisplayName, updatedUsr.DisplayName)
 	}
 
 	dbUsrNew, err := cfg.db.GetUserByID(context.Background(), dbUsr.ID)
@@ -857,14 +857,14 @@ func TestHandleUserUpdatePartialUsernameOnly(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
 
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPatch, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -877,16 +877,16 @@ func TestHandleUserUpdatePartialUsernameOnly(t *testing.T) {
 		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
 	}
 
-	updatedUsr := UserPrivate{}
+	updatedUsr := UserResponse{}
 	if err := json.Unmarshal(rr.Body.Bytes(), &updatedUsr); err != nil {
 		t.Fatalf("error unmarshalling response body: %v\n", err)
 	}
 
-	if updatedUsr.ID != newUsr.ID {
-		t.Fatalf("expected %v got %v", newUsr.ID, updatedUsr.ID)
+	if updatedUsr.ID != newUsr.UserResponse.ID {
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.ID, updatedUsr.ID)
 	}
 
-	if updatedUsr.Email != newUsr.Email {
+	if updatedUsr.Email != newUsr.UserResponse.Email {
 		t.Fatalf("expected %v got %v", *updateUsr.Email, updatedUsr.Email)
 	}
 
@@ -957,7 +957,7 @@ func TestHandleUserDeleteMalformedUUIDInToken(t *testing.T) {
 	data := make([]byte, 0)
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodDelete, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+"this is not a token lol")
 
 	rr := httptest.NewRecorder()
@@ -1011,7 +1011,7 @@ func TestHandleUserDeleteForbidden(t *testing.T) {
 	data := make([]byte, 0)
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodDelete, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	jwt, err := auth.MakeJWT(uuid.New(), cfg.jwtSecret, time.Hour)
 	if err != nil {
 		t.Fatalf("error creating new token")
@@ -1043,7 +1043,7 @@ func TestHandleUserDelete(t *testing.T) {
 	data := make([]byte, 0)
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodDelete, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.ID.String())
+	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
 	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
 
 	rr := httptest.NewRecorder()
@@ -1057,7 +1057,68 @@ func TestHandleUserDelete(t *testing.T) {
 	}
 }
 
-func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) UserPrivate {
+func TestHandleUserLogin(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+	time.Sleep(time.Second * 1)
+
+	defer resetTestDB(t, db)
+
+	usrArgs := UserArgs{
+		Email:    "johnsmith@test.com",
+		Password: "easy123!",
+	}
+
+	data, err := json.Marshal(usrArgs)
+	if err != nil {
+		t.Fatalf("error marshalling json payload: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	request := httptest.NewRequest(http.MethodPost, "/api/login", reader)
+	request.Header.Set("Authorization", "")
+
+	rr := httptest.NewRecorder()
+
+	handler := cfg.handleUserLogin
+
+	handler(rr, request)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected %v got %v", http.StatusOK, rr.Code)
+	}
+
+	authResponse := AuthResponse{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &authResponse); err != nil {
+		t.Fatalf("unable to unmarshal response body: %v\n", err)
+	}
+
+	if authResponse.Token == newUsr.Token {
+		t.Fatalf("expected %v and %v to not be equal\n", authResponse.Token, newUsr.Token)
+	}
+
+	if authResponse.RefreshToken == newUsr.RefreshToken {
+		t.Fatalf("expected %v and %v to not be equal\n", newUsr.RefreshToken, authResponse.RefreshToken)
+	}
+
+	if authResponse.UserResponse.DisplayName != "john_smith07" {
+		t.Fatalf("expected: %v got: %v\n", usrArgs.DisplayName, authResponse.UserResponse.DisplayName)
+	}
+
+	if authResponse.UserResponse.Email != usrArgs.Email {
+		t.Fatalf("expected: %v got: %v\n", usrArgs.Email, authResponse.UserResponse.Email)
+	}
+
+	if authResponse.UserResponse.ID != newUsr.UserResponse.ID {
+		t.Fatalf("expected %v got %v\n", newUsr.UserResponse.ID, authResponse.UserResponse.ID)
+	}
+}
+
+func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) AuthResponse {
 	t.Helper()
 
 	cfg, db, err := newTestConfig()
@@ -1089,32 +1150,32 @@ func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) UserPrivate {
 		t.Fatalf("incorrect status code found in response: %v\nbody: %v\n", rr.Code, rr.Body.String())
 	}
 
-	usrPrivate := UserPrivate{}
-	if err := json.Unmarshal(rr.Body.Bytes(), &usrPrivate); err != nil {
+	authResponse := AuthResponse{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &authResponse); err != nil {
 		t.Fatalf("unable to unmarshal response body: %v\n", err)
 	}
 
-	if usrPrivate.Token == "" {
+	if authResponse.Token == "" {
 		t.Fatalf("unable to create jwt")
 	}
 
-	if usrPrivate.RefreshToken == "" {
+	if authResponse.RefreshToken == "" {
 		t.Fatalf("unable to create refresh token")
 	}
 
-	if usrPrivate.DisplayName != "john_smith07" {
-		t.Fatalf("expected: %v got: %v\n", usrArgs.DisplayName, usrPrivate.DisplayName)
+	if authResponse.UserResponse.DisplayName != "john_smith07" {
+		t.Fatalf("expected: %v got: %v\n", usrArgs.DisplayName, authResponse.UserResponse.DisplayName)
 	}
 
-	if usrPrivate.Email != usrArgs.Email {
-		t.Fatalf("expected: %v got: %v\n", usrArgs.Email, usrPrivate.Email)
+	if authResponse.UserResponse.Email != usrArgs.Email {
+		t.Fatalf("expected: %v got: %v\n", usrArgs.Email, authResponse.UserResponse.Email)
 	}
 
-	if usrPrivate.ID == uuid.Nil {
-		t.Fatalf("expected: new valid uuid got: %v\n", usrPrivate.ID)
+	if authResponse.UserResponse.ID == uuid.Nil {
+		t.Fatalf("expected: new valid uuid got: %v\n", authResponse.UserResponse.ID)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(request.Context(), usrPrivate.ID)
+	dbUsr, err := cfg.db.GetUserByID(request.Context(), authResponse.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("failed to retrieve user from db: %v\n", err)
 	}
@@ -1124,5 +1185,5 @@ func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) UserPrivate {
 		t.Fatalf("password hash invalid or error expected: true got: %v\nerror: %v\n", ok, err)
 	}
 
-	return usrPrivate
+	return authResponse
 }

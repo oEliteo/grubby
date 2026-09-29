@@ -21,6 +21,18 @@ type UserArgs struct {
 	Password    string `json:"password"`
 }
 
+type UserLoginArgs struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+func (u UserLoginArgs) Validate() error {
+	if u.Email == "" || u.Password == "" {
+		return errors.New("all fields required")
+	}
+	return nil
+}
+
 func (u UserArgs) Validate() error {
 	if u.Email == "" || u.DisplayName == "" || u.Password == "" {
 		return errors.New("email, display_name, and password are all required")
@@ -41,15 +53,19 @@ func nullStringFromPtr(s *string) sql.NullString {
 	return sql.NullString{String: *s, Valid: true}
 }
 
-type UserPrivate struct {
-	ID           uuid.UUID `json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Email        string    `json:"email"`
-	DisplayName  string    `json:"display_name"`
-	Token        string    `json:"token"`
-	RefreshToken string    `json:"refresh_token"`
-	IsPremium    bool      `json:"is_premium"`
+type AuthResponse struct {
+	Token        string       `json:"token"`
+	RefreshToken string       `json:"refresh_token"`
+	UserResponse UserResponse `json:"user"`
+}
+
+type UserResponse struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
+	IsPremium   bool      `json:"is_premium"`
 }
 
 type UserPublic struct {
@@ -61,7 +77,7 @@ func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 	usrArgs := UserArgs{}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&usrArgs); err != nil {
-		cfg.log.Warn("error decoding response body", slog.String("error", err.Error()))
+		cfg.log.Warn("error decoding request body", slog.String("error", err.Error()))
 		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
 		return
 	}
@@ -117,19 +133,98 @@ func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
+	usrResponse := UserResponse{
+		ID:          dbUsr.ID,
+		CreatedAt:   dbUsr.CreatedAt,
+		UpdatedAt:   dbUsr.UpdatedAt,
+		DisplayName: dbUsr.DisplayName,
+		Email:       dbUsr.Email,
+		IsPremium:   dbUsr.IsPremium,
+	}
 
-	usrPrivate := UserPrivate{
-		ID:           dbUsr.ID,
-		CreatedAt:    dbUsr.CreatedAt,
-		UpdatedAt:    dbUsr.UpdatedAt,
-		DisplayName:  dbUsr.DisplayName,
-		Email:        dbUsr.Email,
+	usrPrivate := AuthResponse{
 		Token:        jwt,
 		RefreshToken: dbRefreshToken.Token,
-		IsPremium:    dbUsr.IsPremium,
+		UserResponse: usrResponse,
 	}
 
 	cfg.respondWithJSON(w, http.StatusCreated, usrPrivate)
+}
+
+func (cfg *apiConfig) handleUserLogin(w http.ResponseWriter, r *http.Request) {
+	usrArgs := UserLoginArgs{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&usrArgs); err != nil {
+		cfg.log.Warn("error decoding request body", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	if err := usrArgs.Validate(); err != nil {
+		cfg.log.Info("error missing required fields", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	dbUsr, err := cfg.db.GetUserByEmail(r.Context(), usrArgs.Email)
+	if err != nil {
+		cfg.log.Warn("error fetching user with provided email", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	ok, err := auth.CheckPasswordHash(usrArgs.Password, dbUsr.HashedPassword)
+	if err != nil {
+		cfg.log.Warn("failed login attempt", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	if !ok {
+		cfg.log.Warn("failed login attempt", slog.String("error", "invalid credentials"))
+		cfg.respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	jwt, err := auth.MakeJWT(dbUsr.ID, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		cfg.log.Warn("error creating json web token for new user", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	refreshToken := auth.MakeRefreshToken()
+	refreshExpiry := time.Now().AddDate(0, 0, 60)
+
+	dbRefreshTokenArgs := database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    dbUsr.ID,
+		ExpiresAt: refreshExpiry,
+		RevokedAt: sql.NullTime{},
+	}
+
+	dbRefreshToken, err := cfg.db.CreateRefreshToken(r.Context(), dbRefreshTokenArgs)
+	if err != nil {
+		cfg.log.Warn("error creating refresh token for new user", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	usrResponse := UserResponse{
+		ID:          dbUsr.ID,
+		CreatedAt:   dbUsr.CreatedAt,
+		UpdatedAt:   dbUsr.UpdatedAt,
+		DisplayName: dbUsr.DisplayName,
+		Email:       dbUsr.Email,
+		IsPremium:   dbUsr.IsPremium,
+	}
+
+	usrPrivate := AuthResponse{
+		Token:        jwt,
+		RefreshToken: dbRefreshToken.Token,
+		UserResponse: usrResponse,
+	}
+
+	cfg.respondWithJSON(w, http.StatusOK, usrPrivate)
 }
 
 func (cfg *apiConfig) handleUserGetByIDPublic(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +306,7 @@ func (cfg *apiConfig) handleUserUpdateFull(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	usrResponsePrivate := UserPrivate{
+	usrResponsePrivate := UserResponse{
 		ID:          dbUsr.ID,
 		CreatedAt:   dbUsr.CreatedAt,
 		UpdatedAt:   dbUsr.UpdatedAt,
@@ -300,7 +395,7 @@ func (cfg *apiConfig) handleUserUpdatePartial(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	usrResponsePrivate := UserPrivate{
+	usrResponsePrivate := UserResponse{
 		ID:          dbUsr.ID,
 		CreatedAt:   dbUsr.CreatedAt,
 		UpdatedAt:   dbUsr.UpdatedAt,
