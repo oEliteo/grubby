@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"grubby/internal/auth"
 	"grubby/internal/database"
 	"grubby/internal/logging"
@@ -1123,7 +1122,6 @@ func TestHandleUserRevokeRefreshToken(t *testing.T) {
 	handler(rr, request)
 
 	if rr.Code != http.StatusNoContent {
-		fmt.Printf("Status Code From Revoke Endpoint: %v\n", rr.Code)
 		t.Fatalf("failed to revoke refresh token")
 	}
 
