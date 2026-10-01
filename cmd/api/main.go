@@ -68,12 +68,14 @@ func main() {
 	mux.HandleFunc("GET /health", cfg.handleCheckHealth)
 
 	// User Create, Read, Update, Delete Routes + Methods
-	mux.HandleFunc("POST /api/users", cfg.handleUserCreate)
-	mux.HandleFunc("GET /api/users/{userID}", cfg.handleUserGetByIDPublic)
-	mux.HandleFunc("POST /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdateFull))
 	mux.HandleFunc("PATCH /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdatePartial))
+	mux.HandleFunc("POST /api/users", cfg.handleUserCreate)
+	mux.HandleFunc("POST /api/auth/login", cfg.handleUserLogin)
+	mux.HandleFunc("POST /api/users/{userID}", cfg.Authenticate(cfg.handleUserUpdateFull))
+	mux.HandleFunc("POST /api/auth/refresh", cfg.handleUserRefresh)
+	mux.HandleFunc("POST /api/auth/revoke", cfg.Authenticate(cfg.handleUserRevokeRefreshToken))
+	mux.HandleFunc("GET /api/users/{userID}", cfg.handleUserGetByIDPublic)
 	mux.HandleFunc("DELETE /api/users/{userID}", cfg.Authenticate(cfg.handleUserDelete))
-	mux.HandleFunc("POST /api/login", cfg.handleUserLogin)
 
 	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)

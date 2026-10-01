@@ -14,6 +14,13 @@ import (
 )
 
 // This file contains handler code for Create, Read, Update, and Delete operations on users.
+type RefreshToken struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
+type TokenResponse struct {
+	AccessToken string `json:"access_token"`
+}
 
 type UserArgs struct {
 	Email       string `json:"email"`
@@ -405,6 +412,79 @@ func (cfg *apiConfig) handleUserUpdatePartial(w http.ResponseWriter, r *http.Req
 	}
 
 	cfg.respondWithJSON(w, http.StatusOK, usrResponsePrivate)
+}
+
+func (cfg *apiConfig) handleUserRefresh(w http.ResponseWriter, r *http.Request) {
+
+	refreshToken := RefreshToken{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&refreshToken); err != nil {
+		cfg.log.Warn("error decoding request body", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	dbUsr, err := cfg.db.GetUserFromRefreshToken(r.Context(), refreshToken.RefreshToken)
+	if err != nil {
+		cfg.log.Warn("error getting user from provided refresh token", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	newToken, err := auth.MakeJWT(dbUsr.ID, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		cfg.log.Warn("error creating new jwt for user", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	respToken := TokenResponse{
+		AccessToken: newToken,
+	}
+
+	cfg.respondWithJSON(w, http.StatusOK, respToken)
+}
+
+func (cfg *apiConfig) handleUserRevokeRefreshToken(w http.ResponseWriter, r *http.Request) {
+	authUserID, ok := r.Context().Value(userIDKey).(uuid.UUID)
+	if !ok {
+		cfg.log.Info("userID in context is not a uuid")
+		cfg.respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	refreshToken := RefreshToken{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&refreshToken); err != nil {
+		cfg.log.Warn("error decoding request body", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
+		return
+	}
+
+	dbUsr, err := cfg.db.GetUserFromRefreshToken(r.Context(), refreshToken.RefreshToken)
+
+	if authUserID != dbUsr.ID {
+		cfg.log.Info("current user is not the owner of the resource")
+		cfg.respondWithError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+
+	revokeArgs := database.RevokeRefreshTokenParams{
+		RevokedAt: sql.NullTime{
+			Time:  time.Now(),
+			Valid: true,
+		},
+		Token: refreshToken.RefreshToken,
+	}
+
+	err = cfg.db.RevokeRefreshToken(r.Context(), revokeArgs)
+	if err != nil {
+		cfg.log.Warn("error revoking refresh token", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (cfg *apiConfig) handleUserDelete(w http.ResponseWriter, r *http.Request) {

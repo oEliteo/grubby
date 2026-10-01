@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"grubby/internal/auth"
 	"grubby/internal/database"
 	"grubby/internal/logging"
@@ -1057,6 +1058,87 @@ func TestHandleUserDelete(t *testing.T) {
 	}
 }
 
+func TestHandleUserRefresh(t *testing.T) {
+
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+	time.Sleep(time.Second * 1)
+
+	defer resetTestDB(t, db)
+
+	data, err := json.Marshal(newUsr)
+
+	reader := bytes.NewReader(data)
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", reader)
+
+	rr := httptest.NewRecorder()
+	handler := cfg.handleUserRefresh
+	handler(rr, request)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected %v got %v\n", http.StatusOK, rr.Code)
+	}
+
+	tokenResponse := TokenResponse{}
+	err = json.Unmarshal(rr.Body.Bytes(), &tokenResponse)
+	if err != nil {
+		t.Fatalf("error decoding response body")
+	}
+
+	if tokenResponse.AccessToken == "" {
+		t.Fatalf("expected response to contain new token")
+	}
+
+	if newUsr.Token == tokenResponse.AccessToken {
+		t.Fatalf("expected %v and %v to not be equal", newUsr.Token, tokenResponse.AccessToken)
+	}
+}
+
+func TestHandleUserRevokeRefreshToken(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+
+	newUsr := createNewUser(t, db, cfg)
+	time.Sleep(time.Second * 1)
+
+	defer resetTestDB(t, db)
+
+	data, err := json.Marshal(newUsr)
+	if err != nil {
+		t.Fatalf("error marshalling new user")
+	}
+
+	reader := bytes.NewReader(data)
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/revoke", reader)
+	request.Header.Set("Authorization", "Bearer "+newUsr.Token)
+
+	rr := httptest.NewRecorder()
+	handler := cfg.Authenticate(cfg.handleUserRevokeRefreshToken)
+	handler(rr, request)
+
+	if rr.Code != http.StatusNoContent {
+		fmt.Printf("Status Code From Revoke Endpoint: %v\n", rr.Code)
+		t.Fatalf("failed to revoke refresh token")
+	}
+
+	reader = bytes.NewReader(data)
+	request = httptest.NewRequest(http.MethodPost, "/api/auth/refresh", reader)
+
+	rr = httptest.NewRecorder()
+	handler = cfg.handleUserRefresh
+	handler(rr, request)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected %v got %v\n", http.StatusUnauthorized, rr.Code)
+	}
+}
+
 func TestHandleUserLogin(t *testing.T) {
 	cfg, db, err := newTestConfig()
 	if err != nil {
@@ -1079,7 +1161,7 @@ func TestHandleUserLogin(t *testing.T) {
 	}
 
 	reader := bytes.NewReader(data)
-	request := httptest.NewRequest(http.MethodPost, "/api/login", reader)
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/login", reader)
 	request.Header.Set("Authorization", "")
 
 	rr := httptest.NewRecorder()
