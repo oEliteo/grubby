@@ -75,10 +75,10 @@ func TestHandleUserCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
-
-	createNewUser(t, db, cfg)
 }
 
 func TestHandleGetUserByIDPublic(t *testing.T) {
@@ -86,7 +86,7 @@ func TestHandleGetUserByIDPublic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	defer resetTestDB(t, db)
 
 	newUsr := createNewUser(t, db, cfg)
@@ -128,7 +128,7 @@ func TestHandleUserUpdateFullBadRequest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -177,7 +177,7 @@ func TestHandleUserUpdateFullMalformedUUIDInContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -219,8 +219,10 @@ func TestHandleUserUpdateFullForbidden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	usrA := createNewUser(t, db, cfg)
 
-	newUsr := createNewUser(t, db, cfg)
+	usrB := createNewUserWithParams(t, db, cfg, "janedoe@gmail.com", "easypeasylemonsqueezy", "janedoe07")
 
 	defer resetTestDB(t, db)
 
@@ -235,7 +237,7 @@ func TestHandleUserUpdateFullForbidden(t *testing.T) {
 		t.Fatalf("error marshalling payload: %v\n", err)
 	}
 
-	dbUsr, err := cfg.db.GetUserByID(context.Background(), newUsr.UserResponse.ID)
+	dbUsr, err := cfg.db.GetUserByID(context.Background(), usrA.UserResponse.ID)
 	if err != nil {
 		t.Fatalf("error retrieving user from database: %v\n", err)
 	}
@@ -243,7 +245,7 @@ func TestHandleUserUpdateFullForbidden(t *testing.T) {
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
 	request.SetPathValue("userID", dbUsr.ID.String())
-	token, err := auth.MakeJWT(uuid.New(), cfg.jwtSecret, time.Hour)
+	token, err := auth.MakeJWT(usrB.UserResponse.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		t.Fatalf("failed to make new token")
 	}
@@ -264,7 +266,7 @@ func TestHandleUserUpdateFullMalformedUUIDInPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -299,7 +301,7 @@ func TestHandleUserUpdateFullAllButDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -334,7 +336,7 @@ func TestHandleUserUpdateFullOnlyPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -370,7 +372,7 @@ func TestHandleUserUpdateFullOnlyDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -406,7 +408,7 @@ func TestHandleUserUpdateFullOnlyEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -441,7 +443,7 @@ func TestHandleUserUpdateFullAllButEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -477,7 +479,7 @@ func TestHandleUserUpdateFullAllButPassword(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -513,7 +515,7 @@ func TestHandleUserUpdateFullNoCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -548,7 +550,7 @@ func TestHandleUserUpdateFull(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -612,7 +614,7 @@ func TestHandleUserUpdatePartialPasswordOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -686,7 +688,7 @@ func TestHandleUserUpdatePartialMultiValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -761,7 +763,7 @@ func TestHandleUserUpdatePartialEmailOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -835,7 +837,7 @@ func TestHandleUserUpdatePartialUsernameOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -887,11 +889,11 @@ func TestHandleUserUpdatePartialUsernameOnly(t *testing.T) {
 	}
 
 	if updatedUsr.Email != newUsr.UserResponse.Email {
-		t.Fatalf("expected %v got %v", *updateUsr.Email, updatedUsr.Email)
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.Email, updatedUsr.Email)
 	}
 
 	if updatedUsr.DisplayName != *updateUsr.DisplayName {
-		t.Fatalf("expected %v got %v", *updateUsr.DisplayName, updatedUsr.DisplayName)
+		t.Fatalf("expected %v got %v", newUsr.UserResponse.DisplayName, updatedUsr.DisplayName)
 	}
 
 	dbUsrNew, err := cfg.db.GetUserByID(context.Background(), dbUsr.ID)
@@ -918,8 +920,9 @@ func TestHandleUserCreateMissingField1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	defer resetTestDB(t, db)
 
-	_ = db
 	usrArgs := UserArgs{
 		Email:       "",
 		DisplayName: "john_smith07",
@@ -949,7 +952,7 @@ func TestHandleUserDeleteMalformedUUIDInToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -962,7 +965,7 @@ func TestHandleUserDeleteMalformedUUIDInToken(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	handler := cfg.Authenticate(cfg.handleUserDelete)
+	handler := cfg.Authenticate(cfg.handleUserDeactivateAccount)
 
 	handler(rr, request)
 
@@ -976,7 +979,7 @@ func TestHandleUserDeleteMalformedUUIDInPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -989,7 +992,7 @@ func TestHandleUserDeleteMalformedUUIDInPath(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	handler := cfg.Authenticate(cfg.handleUserDelete)
+	handler := cfg.Authenticate(cfg.handleUserDeactivateAccount)
 
 	handler(rr, request)
 
@@ -1003,16 +1006,18 @@ func TestHandleUserDeleteForbidden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	usrA := createNewUser(t, db, cfg)
 
-	newUsr := createNewUser(t, db, cfg)
+	usrB := createNewUserWithParams(t, db, cfg, "janedoe@gmail.com", "easypeasylemonsqueezy", "janedoe07")
 
 	defer resetTestDB(t, db)
 
 	data := make([]byte, 0)
 	reader := bytes.NewReader(data)
 	request := httptest.NewRequest(http.MethodDelete, "/api/users", reader)
-	request.SetPathValue("userID", newUsr.UserResponse.ID.String())
-	jwt, err := auth.MakeJWT(uuid.New(), cfg.jwtSecret, time.Hour)
+	request.SetPathValue("userID", usrA.UserResponse.ID.String())
+	jwt, err := auth.MakeJWT(usrB.UserResponse.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		t.Fatalf("error creating new token")
 	}
@@ -1021,7 +1026,7 @@ func TestHandleUserDeleteForbidden(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	handler := cfg.Authenticate(cfg.handleUserDelete)
+	handler := cfg.Authenticate(cfg.handleUserDeactivateAccount)
 
 	handler(rr, request)
 
@@ -1035,7 +1040,7 @@ func TestHandleUserDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
-
+	defer db.Close()
 	newUsr := createNewUser(t, db, cfg)
 
 	defer resetTestDB(t, db)
@@ -1048,7 +1053,7 @@ func TestHandleUserDelete(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 
-	handler := cfg.Authenticate(cfg.handleUserDelete)
+	handler := cfg.Authenticate(cfg.handleUserDeactivateAccount)
 
 	handler(rr, request)
 
@@ -1063,11 +1068,10 @@ func TestHandleUserRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	defer resetTestDB(t, db)
 
 	newUsr := createNewUser(t, db, cfg)
-	time.Sleep(time.Second * 1)
-
-	defer resetTestDB(t, db)
 
 	data, err := json.Marshal(newUsr)
 
@@ -1102,11 +1106,10 @@ func TestHandleUserRevokeRefreshToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	defer resetTestDB(t, db)
 
 	newUsr := createNewUser(t, db, cfg)
-	time.Sleep(time.Second * 1)
-
-	defer resetTestDB(t, db)
 
 	data, err := json.Marshal(newUsr)
 	if err != nil {
@@ -1142,11 +1145,10 @@ func TestHandleUserLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error initializing test apiConfig: %v\n", err)
 	}
+	defer db.Close()
+	defer resetTestDB(t, db)
 
 	newUsr := createNewUser(t, db, cfg)
-	time.Sleep(time.Second * 1)
-
-	defer resetTestDB(t, db)
 
 	usrArgs := UserArgs{
 		Email:    "johnsmith@test.com",
@@ -1198,13 +1200,72 @@ func TestHandleUserLogin(t *testing.T) {
 	}
 }
 
-func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) AuthResponse {
+func createNewUserWithParams(t *testing.T, db *sql.DB, cfg *apiConfig, email string, password string, username string) AuthResponse {
 	t.Helper()
 
-	cfg, db, err := newTestConfig()
-	if err != nil {
-		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	_ = db
+	usrArgs := UserArgs{
+		Email:       email,
+		DisplayName: username,
+		Password:    password,
 	}
+	data, err := json.Marshal(usrArgs)
+	if err != nil {
+		t.Fatalf("error marshalling json payload: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+
+	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
+
+	rr := httptest.NewRecorder()
+
+	cfg.handleUserCreate(rr, request)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("incorrect status code found in response: %v\nbody: %v\n", rr.Code, rr.Body.String())
+	}
+
+	authResponse := AuthResponse{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &authResponse); err != nil {
+		t.Fatalf("unable to unmarshal response body: %v\n", err)
+	}
+
+	if authResponse.Token == "" {
+		t.Fatalf("unable to create jwt")
+	}
+
+	if authResponse.RefreshToken == "" {
+		t.Fatalf("unable to create refresh token")
+	}
+
+	if authResponse.UserResponse.DisplayName != username {
+		t.Fatalf("expected: %v got: %v\n", username, authResponse.UserResponse.DisplayName)
+	}
+
+	if authResponse.UserResponse.Email != email {
+		t.Fatalf("expected: %v got: %v\n", email, authResponse.UserResponse.Email)
+	}
+
+	if authResponse.UserResponse.ID == uuid.Nil {
+		t.Fatalf("expected: new valid uuid got: %v\n", authResponse.UserResponse.ID)
+	}
+
+	dbUsr, err := cfg.db.GetUserByID(request.Context(), authResponse.UserResponse.ID)
+	if err != nil {
+		t.Fatalf("failed to retrieve user from db: %v\n", err)
+	}
+
+	ok, err := auth.CheckPasswordHash(password, dbUsr.HashedPassword)
+	if !ok || err != nil {
+		t.Fatalf("password hash invalid or error expected: true got: %v\nerror: %v\n", ok, err)
+	}
+
+	return authResponse
+}
+
+func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) AuthResponse {
+	t.Helper()
 
 	_ = db
 	usrArgs := UserArgs{

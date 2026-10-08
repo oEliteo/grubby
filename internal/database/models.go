@@ -6,10 +6,26 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type Recipe struct {
+	ID              uuid.UUID
+	UserID          uuid.NullUUID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Title           string
+	Description     sql.NullString
+	IsPublic        bool
+	Ingredients     json.RawMessage
+	Nutrition       *json.RawMessage
+	Instructions    string
+	NutritionStatus string
+	DeletedAt       sql.NullTime
+}
 
 type RefreshToken struct {
 	Token     string
@@ -28,4 +44,5 @@ type User struct {
 	DisplayName    string
 	HashedPassword string
 	IsPremium      bool
+	DeletedAt      sql.NullTime
 }

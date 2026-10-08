@@ -65,19 +65,22 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
-const deleteUser = `-- name: DeleteUser :exec
-DELETE FROM users
+const deactivateUserAccount = `-- name: DeactivateUserAccount :exec
+UPDATE users
+SET deleted_at = NOW()
 WHERE id = $1
+AND deleted_at IS NULL
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+func (q *Queries) DeactivateUserAccount(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deactivateUserAccount, id)
 	return err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, created_at, updated_at, email, display_name, hashed_password, is_premium FROM users
+SELECT id, created_at, updated_at, email, display_name, hashed_password, is_premium, deleted_at FROM users
 WHERE email = $1
+AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -91,13 +94,15 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.DisplayName,
 		&i.HashedPassword,
 		&i.IsPremium,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, created_at, updated_at, email, display_name, hashed_password, is_premium FROM users
+SELECT id, created_at, updated_at, email, display_name, hashed_password, is_premium, deleted_at FROM users
 WHERE id = $1
+AND deleted_at IS NULL
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -111,8 +116,19 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.DisplayName,
 		&i.HashedPassword,
 		&i.IsPremium,
+		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const purgeExpiredUserAccounts = `-- name: PurgeExpiredUserAccounts :exec
+DELETE FROM users
+WHERE deleted_at < NOW() - INTERVAL '30 days'
+`
+
+func (q *Queries) PurgeExpiredUserAccounts(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, purgeExpiredUserAccounts)
+	return err
 }
 
 const updateUserFull = `-- name: UpdateUserFull :one
@@ -122,6 +138,7 @@ SET display_name = $1,
    hashed_password = $3,
    updated_at = NOW()
 WHERE id = $4
+AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, display_name, email, is_premium
 `
 
@@ -167,6 +184,7 @@ SET display_name = COALESCE($1, display_name),
    hashed_password = COALESCE($3, hashed_password),
    updated_at = NOW()
 WHERE id = $4
+AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, display_name, email, is_premium
 `
 

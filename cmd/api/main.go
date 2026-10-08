@@ -75,7 +75,7 @@ func main() {
 	mux.HandleFunc("POST /api/auth/refresh", cfg.handleUserRefresh)
 	mux.HandleFunc("POST /api/auth/revoke", cfg.Authenticate(cfg.handleUserRevokeRefreshToken))
 	mux.HandleFunc("GET /api/users/{userID}", cfg.handleUserGetByIDPublic)
-	mux.HandleFunc("DELETE /api/users/{userID}", cfg.Authenticate(cfg.handleUserDelete))
+	mux.HandleFunc("DELETE /api/users/{userID}", cfg.Authenticate(cfg.handleUserDeactivateAccount))
 
 	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)

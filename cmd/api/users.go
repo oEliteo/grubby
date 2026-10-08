@@ -487,7 +487,7 @@ func (cfg *apiConfig) handleUserRevokeRefreshToken(w http.ResponseWriter, r *htt
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (cfg *apiConfig) handleUserDelete(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handleUserDeactivateAccount(w http.ResponseWriter, r *http.Request) {
 	targetUserID, err := uuid.Parse(r.PathValue("userID"))
 	if err != nil {
 		cfg.log.Info("malformed uuid parsed from path", slog.String("error", err.Error()))
@@ -508,7 +508,7 @@ func (cfg *apiConfig) handleUserDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = cfg.db.DeleteUser(r.Context(), targetUserID)
+	err = cfg.db.DeactivateUserAccount(r.Context(), targetUserID)
 	if err != nil {
 		cfg.log.Info("unable to delete specified user", slog.String("error", err.Error()))
 		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")

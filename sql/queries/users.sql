@@ -14,11 +14,13 @@ RETURNING id, created_at, updated_at, email, display_name, is_premium;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users
-WHERE email = $1;
+WHERE email = $1
+AND deleted_at IS NULL;
 
 -- name: GetUserByID :one
 SELECT * FROM users
-WHERE id = $1;
+WHERE id = $1
+AND deleted_at IS NULL;
 
 -- name: UpdateUserPartial :one
 UPDATE users
@@ -27,6 +29,7 @@ SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
    hashed_password = COALESCE(sqlc.narg('hashed_password'), hashed_password),
    updated_at = NOW()
 WHERE id = sqlc.arg('id')
+AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, display_name, email, is_premium;
 
 -- name: UpdateUserFull :one
@@ -36,8 +39,15 @@ SET display_name = $1,
    hashed_password = $3,
    updated_at = NOW()
 WHERE id = $4
+AND deleted_at IS NULL
 RETURNING id, created_at, updated_at, display_name, email, is_premium;
 
--- name: DeleteUser :exec
+-- name: DeactivateUserAccount :exec
+UPDATE users
+SET deleted_at = NOW()
+WHERE id = $1
+AND deleted_at IS NULL;
+
+-- name: PurgeExpiredUserAccounts :exec
 DELETE FROM users
-WHERE id = $1;
+WHERE deleted_at < NOW() - INTERVAL '30 days';
