@@ -72,7 +72,7 @@ type CreateRecipeParams struct {
 	Description  sql.NullString
 	IsPublic     bool
 	Ingredients  json.RawMessage
-	Instructions string
+	Instructions json.RawMessage
 }
 
 func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Recipe, error) {
@@ -282,7 +282,7 @@ type UpdateRecipeFullParams struct {
 	Description  sql.NullString
 	IsPublic     bool
 	Ingredients  json.RawMessage
-	Instructions string
+	Instructions json.RawMessage
 	ID           uuid.UUID
 	UserID       uuid.NullUUID
 }

@@ -77,6 +77,9 @@ func main() {
 	mux.HandleFunc("GET /api/users/{userID}", cfg.handleUserGetByIDPublic)
 	mux.HandleFunc("DELETE /api/users/{userID}", cfg.Authenticate(cfg.handleUserDeactivateAccount))
 
+	// Recipe Create, Read, Update, Delete Routes + Methods
+	mux.HandleFunc("POST /api/recipes", cfg.Authenticate(cfg.handleRecipeCreate))
+
 	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)
 

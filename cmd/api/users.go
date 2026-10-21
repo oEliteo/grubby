@@ -4,13 +4,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
+	pq "github.com/lib/pq"
 	"grubby/internal/auth"
 	"grubby/internal/database"
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // This file contains handler code for Create, Read, Update, and Delete operations on users.
@@ -112,7 +112,15 @@ func (cfg *apiConfig) handleUserCreate(w http.ResponseWriter, r *http.Request) {
 
 	dbUsr, err := cfg.db.CreateUser(r.Context(), dbUsrArgs)
 	if err != nil {
-		cfg.log.Warn("error creating new user in grubby database", slog.String("error", err.Error()))
+		if pqErr, ok := errors.AsType[*pq.Error](err); ok {
+			if pqErr.Code == "23514" || pqErr.Code == "23505" {
+				cfg.log.Warn("database constraint violation", slog.String("error", pqErr.Error()))
+				cfg.respondWithError(w, http.StatusBadRequest, "invalid input or duplicate value")
+				return
+			}
+		}
+
+		cfg.log.Error("error creating user", slog.String("error", err.Error()))
 		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}

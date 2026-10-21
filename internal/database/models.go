@@ -22,7 +22,7 @@ type Recipe struct {
 	IsPublic        bool
 	Ingredients     json.RawMessage
 	Nutrition       *json.RawMessage
-	Instructions    string
+	Instructions    json.RawMessage
 	NutritionStatus string
 	DeletedAt       sql.NullTime
 }

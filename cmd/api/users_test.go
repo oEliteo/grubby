@@ -1328,3 +1328,34 @@ func createNewUser(t *testing.T, db *sql.DB, cfg *apiConfig) AuthResponse {
 
 	return authResponse
 }
+
+func TestHandleUserCreateDisplayNameTooShort(t *testing.T) {
+	cfg, db, err := newTestConfig()
+	if err != nil {
+		t.Fatalf("error initializing test apiConfig: %v\n", err)
+	}
+	defer db.Close()
+	defer resetTestDB(t, db)
+
+	userArgs := UserArgs{
+		Email:       "test@example.com",
+		DisplayName: "ab",
+		Password:    "SecurePassword123!",
+	}
+
+	data, err := json.Marshal(userArgs)
+	if err != nil {
+		t.Fatalf("error marshalling payload: %v\n", err)
+	}
+
+	reader := bytes.NewReader(data)
+	request := httptest.NewRequest(http.MethodPost, "/api/users", reader)
+
+	rr := httptest.NewRecorder()
+	handler := http.HandlerFunc(cfg.handleUserCreate)
+	handler.ServeHTTP(rr, request)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected %v got %v (body: %s)", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+}
