@@ -71,12 +71,83 @@ AND deleted_at IS NULL
 RETURNING *;
 
 -- name: GetAllPublicRecipesByOwnerID :many
-SELECT * FROM recipes
+SELECT 
+   r.id,
+   r.user_id,
+   r.title,
+   r.description,
+   r.is_public,
+   r.ingredients,
+   r.instructions,
+   r.created_at,
+   r.updated_at,
+   r.deleted_at,
+   r.nutrition,
+   r.nutrition_status,
+   (
+   CASE
+      WHEN u.deleted_at IS NOT NULL or u.id IS NULL THEN 'Deleted User'
+      ELSE u.display_name
+   END
+   )::TEXT AS author_name
+FROM recipes r
+JOIN users u ON r.user_id = u.id
 WHERE user_id = $1
 AND is_public IS TRUE
-AND deleted_at IS NULL;
+AND deleted_at IS NULL
+ORDER BY r.created_at DESC
+LIMIT $2 OFFSET $3;
 
 -- name: GetAllRecipesByOwnerID :many
-SELECT * FROM recipes
+SELECT 
+   r.id,
+   r.user_id,
+   r.title,
+   r.description,
+   r.is_public,
+   r.ingredients,
+   r.instructions,
+   r.created_at,
+   r.updated_at,
+   r.deleted_at,
+   r.nutrition,
+   r.nutrition_status,
+   (
+   CASE
+      WHEN u.deleted_at IS NOT NULL or u.id IS NULL THEN 'Deleted User'
+      ELSE u.display_name
+   END
+   )::TEXT AS author_name
+FROM recipes r
+JOIN users u ON r.user_id = u.id
 WHERE user_id = $1
-AND deleted_at IS NULL;
+AND deleted_at IS NULL
+ORDER BY r.created_at DESC
+LIMIT $2 OFFSET $3;
+
+-- name: GetAllPublicRecipes :many
+SELECT
+   r.id,
+   r.user_id,
+   r.title,
+   r.description,
+   r.is_public,
+   r.ingredients,
+   r.instructions,
+   r.created_at,
+   r.updated_at,
+   r.deleted_at,
+   r.nutrition,
+   r.nutrition_status,
+   (
+   CASE
+      WHEN u.deleted_at IS NOT NULL or u.id IS NULL THEN 'Deleted User'
+      ELSE u.display_name
+   END
+   )::TEXT AS author_name
+FROM recipes r
+JOIN users u ON r.user_id = u.id
+WHERE r.is_public IS TRUE
+AND r.deleted_at IS NULL
+ORDER BY r.created_at DESC
+LIMIT $1 OFFSET $2;

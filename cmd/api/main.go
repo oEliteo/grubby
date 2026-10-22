@@ -79,9 +79,11 @@ func main() {
 
 	// Recipe Create, Read, Update, Delete Routes + Methods
 	mux.HandleFunc("POST /api/recipes", cfg.Authenticate(cfg.handleRecipeCreate))
+	mux.HandleFunc("GET /api/recipes", cfg.handleRecipeGetAllPublic)
 
 	//Wrap mux with logger.
 	loggedMux := middleware.RequestLogger(log)(mux)
+	loggedMux = middleware.CORS(loggedMux)
 
 	//Log server start.
 	log.Info("HTTP Server Starting...")

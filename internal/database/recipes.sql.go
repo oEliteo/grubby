@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -103,35 +104,166 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 	return i, err
 }
 
-const getAllPublicRecipesByOwnerID = `-- name: GetAllPublicRecipesByOwnerID :many
-SELECT id, user_id, created_at, updated_at, title, description, is_public, ingredients, nutrition, instructions, nutrition_status, deleted_at FROM recipes
-WHERE user_id = $1
-AND is_public IS TRUE
-AND deleted_at IS NULL
+const getAllPublicRecipes = `-- name: GetAllPublicRecipes :many
+SELECT
+   r.id,
+   r.user_id,
+   r.title,
+   r.description,
+   r.is_public,
+   r.ingredients,
+   r.instructions,
+   r.created_at,
+   r.updated_at,
+   r.deleted_at,
+   r.nutrition,
+   r.nutrition_status,
+   (
+   CASE
+      WHEN u.deleted_at IS NOT NULL or u.id IS NULL THEN 'Deleted User'
+      ELSE u.display_name
+   END
+   )::TEXT AS author_name
+FROM recipes r
+JOIN users u ON r.user_id = u.id
+WHERE r.is_public IS TRUE
+AND r.deleted_at IS NULL
+ORDER BY r.created_at DESC
+LIMIT $1 OFFSET $2
 `
 
-func (q *Queries) GetAllPublicRecipesByOwnerID(ctx context.Context, userID uuid.NullUUID) ([]Recipe, error) {
-	rows, err := q.db.QueryContext(ctx, getAllPublicRecipesByOwnerID, userID)
+type GetAllPublicRecipesParams struct {
+	Limit  int32
+	Offset int32
+}
+
+type GetAllPublicRecipesRow struct {
+	ID              uuid.UUID
+	UserID          uuid.NullUUID
+	Title           string
+	Description     sql.NullString
+	IsPublic        bool
+	Ingredients     json.RawMessage
+	Instructions    json.RawMessage
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       sql.NullTime
+	Nutrition       *json.RawMessage
+	NutritionStatus string
+	AuthorName      string
+}
+
+func (q *Queries) GetAllPublicRecipes(ctx context.Context, arg GetAllPublicRecipesParams) ([]GetAllPublicRecipesRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllPublicRecipes, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Recipe
+	var items []GetAllPublicRecipesRow
 	for rows.Next() {
-		var i Recipe
+		var i GetAllPublicRecipesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.Title,
 			&i.Description,
 			&i.IsPublic,
 			&i.Ingredients,
-			&i.Nutrition,
 			&i.Instructions,
-			&i.NutritionStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.Nutrition,
+			&i.NutritionStatus,
+			&i.AuthorName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllPublicRecipesByOwnerID = `-- name: GetAllPublicRecipesByOwnerID :many
+SELECT 
+   r.id,
+   r.user_id,
+   r.title,
+   r.description,
+   r.is_public,
+   r.ingredients,
+   r.instructions,
+   r.created_at,
+   r.updated_at,
+   r.deleted_at,
+   r.nutrition,
+   r.nutrition_status,
+   (
+   CASE
+      WHEN u.deleted_at IS NOT NULL or u.id IS NULL THEN 'Deleted User'
+      ELSE u.display_name
+   END
+   )::TEXT AS author_name
+FROM recipes r
+JOIN users u ON r.user_id = u.id
+WHERE user_id = $1
+AND is_public IS TRUE
+AND deleted_at IS NULL
+ORDER BY r.created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetAllPublicRecipesByOwnerIDParams struct {
+	UserID uuid.NullUUID
+	Limit  int32
+	Offset int32
+}
+
+type GetAllPublicRecipesByOwnerIDRow struct {
+	ID              uuid.UUID
+	UserID          uuid.NullUUID
+	Title           string
+	Description     sql.NullString
+	IsPublic        bool
+	Ingredients     json.RawMessage
+	Instructions    json.RawMessage
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       sql.NullTime
+	Nutrition       *json.RawMessage
+	NutritionStatus string
+	AuthorName      string
+}
+
+func (q *Queries) GetAllPublicRecipesByOwnerID(ctx context.Context, arg GetAllPublicRecipesByOwnerIDParams) ([]GetAllPublicRecipesByOwnerIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllPublicRecipesByOwnerID, arg.UserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllPublicRecipesByOwnerIDRow
+	for rows.Next() {
+		var i GetAllPublicRecipesByOwnerIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.Description,
+			&i.IsPublic,
+			&i.Ingredients,
+			&i.Instructions,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.Nutrition,
+			&i.NutritionStatus,
+			&i.AuthorName,
 		); err != nil {
 			return nil, err
 		}
@@ -147,33 +279,78 @@ func (q *Queries) GetAllPublicRecipesByOwnerID(ctx context.Context, userID uuid.
 }
 
 const getAllRecipesByOwnerID = `-- name: GetAllRecipesByOwnerID :many
-SELECT id, user_id, created_at, updated_at, title, description, is_public, ingredients, nutrition, instructions, nutrition_status, deleted_at FROM recipes
+SELECT 
+   r.id,
+   r.user_id,
+   r.title,
+   r.description,
+   r.is_public,
+   r.ingredients,
+   r.instructions,
+   r.created_at,
+   r.updated_at,
+   r.deleted_at,
+   r.nutrition,
+   r.nutrition_status,
+   (
+   CASE
+      WHEN u.deleted_at IS NOT NULL or u.id IS NULL THEN 'Deleted User'
+      ELSE u.display_name
+   END
+   )::TEXT AS author_name
+FROM recipes r
+JOIN users u ON r.user_id = u.id
 WHERE user_id = $1
 AND deleted_at IS NULL
+ORDER BY r.created_at DESC
+LIMIT $2 OFFSET $3
 `
 
-func (q *Queries) GetAllRecipesByOwnerID(ctx context.Context, userID uuid.NullUUID) ([]Recipe, error) {
-	rows, err := q.db.QueryContext(ctx, getAllRecipesByOwnerID, userID)
+type GetAllRecipesByOwnerIDParams struct {
+	UserID uuid.NullUUID
+	Limit  int32
+	Offset int32
+}
+
+type GetAllRecipesByOwnerIDRow struct {
+	ID              uuid.UUID
+	UserID          uuid.NullUUID
+	Title           string
+	Description     sql.NullString
+	IsPublic        bool
+	Ingredients     json.RawMessage
+	Instructions    json.RawMessage
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       sql.NullTime
+	Nutrition       *json.RawMessage
+	NutritionStatus string
+	AuthorName      string
+}
+
+func (q *Queries) GetAllRecipesByOwnerID(ctx context.Context, arg GetAllRecipesByOwnerIDParams) ([]GetAllRecipesByOwnerIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllRecipesByOwnerID, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Recipe
+	var items []GetAllRecipesByOwnerIDRow
 	for rows.Next() {
-		var i Recipe
+		var i GetAllRecipesByOwnerIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.Title,
 			&i.Description,
 			&i.IsPublic,
 			&i.Ingredients,
-			&i.Nutrition,
 			&i.Instructions,
-			&i.NutritionStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.Nutrition,
+			&i.NutritionStatus,
+			&i.AuthorName,
 		); err != nil {
 			return nil, err
 		}

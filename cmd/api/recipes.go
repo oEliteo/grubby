@@ -41,6 +41,32 @@ type RecipeResponse struct {
 	NutritionStatus string          `json:"nutrition_status"`
 }
 
+type RecipeWithAuthor struct {
+	ID              uuid.UUID       `json:"id"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+	Title           string          `json:"title"`
+	Description     *string         `json:"description,omitempty"`
+	IsPublic        bool            `json:"is_public"`
+	Ingredients     []Ingredient    `json:"ingredients"`
+	Instructions    []string        `json:"instructions"`
+	Nutrition       json.RawMessage `json:"nutrition,omitempty"`
+	NutritionStatus string          `json:"nutrition_status"`
+	AuthorName      string          `json:"author_name"`
+}
+
+type PaginatedRecipesResponse struct {
+	Recipes    []RecipeWithAuthor `json:"recipes"`
+	Pagination PaginationMeta     `json:"pagination"`
+}
+
+type PaginationMeta struct {
+	Page       int32 `json:"page"`
+	PerPage    int32 `json:"per_page"`
+	TotalCount int64 `json:"total_count"`
+	TotalPages int32 `json:"total_pages"`
+}
+
 func NewNullString(s string) sql.NullString {
 	if s == "" {
 		return sql.NullString{Valid: false}
@@ -157,4 +183,67 @@ func (cfg *apiConfig) handleRecipeCreate(w http.ResponseWriter, r *http.Request)
 	}
 
 	cfg.respondWithJSON(w, http.StatusCreated, recipe)
+}
+
+func (cfg *apiConfig) handleRecipeGetAllPublic(w http.ResponseWriter, r *http.Request) {
+	var limit, page int32
+
+	limit = 10
+	page = 1
+
+	offset := (page - 1) * limit
+
+	getAllRecipeParams := database.GetAllPublicRecipesParams{
+		Limit:  limit,
+		Offset: offset,
+	}
+	dbRows, err := cfg.db.GetAllPublicRecipes(r.Context(), getAllRecipeParams)
+	if err != nil {
+		cfg.log.Warn("error fetching recipes", slog.String("error", err.Error()))
+		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	recipes := make([]RecipeWithAuthor, len(dbRows))
+	for i, row := range dbRows {
+		var description *string
+		if row.Description.Valid {
+			description = &row.Description.String
+		}
+
+		ingredients, err := UnmarshalJSONB[[]Ingredient](row.Ingredients)
+		if err != nil {
+			cfg.log.Warn("error unmarshalling ingredients", slog.String("error", err.Error()))
+			cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		instructions, err := UnmarshalJSONB[[]string](row.Instructions)
+		if err != nil {
+			cfg.log.Warn("error unmarshalling instructions", slog.String("error", err.Error()))
+			cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		var nutrition json.RawMessage
+		if row.Nutrition != nil {
+			nutrition = *row.Nutrition
+		}
+
+		recipes[i] = RecipeWithAuthor{
+			ID:              row.ID,
+			AuthorName:      row.AuthorName,
+			CreatedAt:       row.CreatedAt,
+			UpdatedAt:       row.UpdatedAt,
+			Title:           row.Title,
+			Description:     description,
+			Ingredients:     ingredients,
+			Instructions:    instructions,
+			Nutrition:       nutrition,
+			NutritionStatus: row.NutritionStatus,
+			IsPublic:        row.IsPublic,
+		}
+	}
+
+	cfg.respondWithJSON(w, http.StatusOK, recipes)
 }
