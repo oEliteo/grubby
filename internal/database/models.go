@@ -6,10 +6,10 @@ package database
 
 import (
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
+	models "grubby/internal/models"
 )
 
 type Recipe struct {
@@ -20,9 +20,9 @@ type Recipe struct {
 	Title           string
 	Description     sql.NullString
 	IsPublic        bool
-	Ingredients     json.RawMessage
-	Nutrition       *json.RawMessage
-	Instructions    json.RawMessage
+	Ingredients     []models.Ingredient
+	Nutrition       *models.Nutrition
+	Instructions    []models.Instruction
 	NutritionStatus string
 	DeletedAt       sql.NullTime
 }

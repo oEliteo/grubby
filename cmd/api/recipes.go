@@ -4,85 +4,23 @@ import (
 	"database/sql"
 	"encoding/json"
 	"grubby/internal/database"
+	"grubby/internal/models"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 )
 
 // This file contains handler code for Create, Read, Update, and Delete operations on recipes.
-type Ingredient struct {
-	Name   string  `json:"name"`
-	Amount float64 `json:"amount"`
-	Unit   string  `json:"unit"`
-}
-
-type RecipeArgs struct {
-	ID           uuid.UUID    `json:"id"`
-	Title        string       `json:"title"`
-	Description  string       `json:"description"`
-	IsPublic     bool         `json:"is_public"`
-	Ingredients  []Ingredient `json:"ingredients"`
-	Instructions []string     `json:"instructions"`
-}
-
-type RecipeResponse struct {
-	ID              uuid.UUID       `json:"id"`
-	AuthorID        uuid.UUID       `json:"author"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	Title           string          `json:"title"`
-	Description     *string         `json:"description,omitempty"`
-	IsPublic        bool            `json:"is_public"`
-	Ingredients     []Ingredient    `json:"ingredients"`
-	Instructions    []string        `json:"instructions"`
-	Nutrition       json.RawMessage `json:"nutrition,omitempty"`
-	NutritionStatus string          `json:"nutrition_status"`
-}
-
-type RecipeWithAuthor struct {
-	ID              uuid.UUID       `json:"id"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	Title           string          `json:"title"`
-	Description     *string         `json:"description,omitempty"`
-	IsPublic        bool            `json:"is_public"`
-	Ingredients     []Ingredient    `json:"ingredients"`
-	Instructions    []string        `json:"instructions"`
-	Nutrition       json.RawMessage `json:"nutrition,omitempty"`
-	NutritionStatus string          `json:"nutrition_status"`
-	AuthorName      string          `json:"author_name"`
-}
-
-type PaginatedRecipesResponse struct {
-	Recipes    []RecipeWithAuthor `json:"recipes"`
-	Pagination PaginationMeta     `json:"pagination"`
-}
-
-type PaginationMeta struct {
-	Page       int32 `json:"page"`
-	PerPage    int32 `json:"per_page"`
-	TotalCount int64 `json:"total_count"`
-	TotalPages int32 `json:"total_pages"`
-}
-
-func NewNullString(s string) sql.NullString {
-	if s == "" {
-		return sql.NullString{Valid: false}
+func newNullStringFromPtr(s *string) sql.NullString {
+	if s != nil {
+		return sql.NullString{
+			String: *s,
+			Valid:  true,
+		}
+	} else {
+		return sql.NullString{}
 	}
-
-	return sql.NullString{String: s, Valid: true}
-}
-
-func MarshalJSONB[T any](v T) (json.RawMessage, error) {
-	return json.Marshal(v)
-}
-
-func UnmarshalJSONB[T any](data []byte) (T, error) {
-	var v T
-	err := json.Unmarshal(data, &v)
-	return v, err
 }
 
 func (cfg *apiConfig) handleRecipeCreate(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +31,7 @@ func (cfg *apiConfig) handleRecipeCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	recipeArgs := RecipeArgs{}
+	recipeArgs := models.RecipeArgs{}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&recipeArgs); err != nil {
 		cfg.log.Warn("error decoding request body", slog.String("error", err.Error()))
@@ -106,144 +44,43 @@ func (cfg *apiConfig) handleRecipeCreate(w http.ResponseWriter, r *http.Request)
 		UUID:  authUserID,
 	}
 
-	ingredientsJSON, err := MarshalJSONB(recipeArgs.Ingredients)
-	if err != nil {
-		cfg.log.Warn("error marshalling ingredients", slog.String("error", err.Error()))
-		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
-		return
-	}
+	recipeID := uuid.New()
 
-	instructionsJSON, err := MarshalJSONB(recipeArgs.Instructions)
-	if err != nil {
-		cfg.log.Warn("error marshalling instructions", slog.String("error", err.Error()))
-		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
-		return
-	}
-
-	if recipeArgs.Title == "" {
-		cfg.log.Warn("recipe title is missing or empty")
-		cfg.respondWithError(w, http.StatusBadRequest, "title is required")
-		return
-	}
-
-	dbRecipeArgs := database.CreateRecipeParams{
-		ID:           uuid.New(),
+	recipeParams := database.CreateRecipeParams{
+		ID:           recipeID,
 		UserID:       ownerID,
 		Title:        recipeArgs.Title,
-		Description:  NewNullString(recipeArgs.Description),
+		Description:  newNullStringFromPtr(recipeArgs.Description),
 		IsPublic:     recipeArgs.IsPublic,
-		Ingredients:  ingredientsJSON,
-		Instructions: instructionsJSON,
+		Ingredients:  recipeArgs.Ingredients,
+		Instructions: recipeArgs.Instructions,
 	}
 
-	dbRecipe, err := cfg.db.CreateRecipe(r.Context(), dbRecipeArgs)
+	dbRecipe, err := cfg.db.CreateRecipe(r.Context(), recipeParams)
 	if err != nil {
 		cfg.log.Warn("error creating recipe", slog.String("error", err.Error()))
 		cfg.respondWithError(w, http.StatusBadRequest, "bad request")
 		return
 	}
 
-	var descriptionPtr *string
-
+	var recipeDescription *string
 	if dbRecipe.Description.Valid {
-		descriptionPtr = &dbRecipe.Description.String
+		recipeDescription = &dbRecipe.Description.String
 	}
 
-	var nutritionData json.RawMessage
-	if dbRecipe.Nutrition != nil {
-		nutritionData = *dbRecipe.Nutrition
-	}
-
-	ingredients, err := UnmarshalJSONB[[]Ingredient](dbRecipe.Ingredients)
-	if err != nil {
-		cfg.log.Warn("error unmarshalling ingredients", slog.String("error", err.Error()))
-		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
-		return
-	}
-
-	instructions, err := UnmarshalJSONB[[]string](dbRecipe.Instructions)
-	if err != nil {
-		cfg.log.Warn("error unmarshalling instructions", slog.String("error", err.Error()))
-		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
-		return
-	}
-
-	recipe := RecipeResponse{
+	recipeResponse := models.RecipeResponse{
 		ID:              dbRecipe.ID,
 		AuthorID:        dbRecipe.UserID.UUID,
 		CreatedAt:       dbRecipe.CreatedAt,
 		UpdatedAt:       dbRecipe.UpdatedAt,
 		Title:           dbRecipe.Title,
-		Description:     descriptionPtr,
-		Ingredients:     ingredients,
-		Instructions:    instructions,
-		NutritionStatus: dbRecipe.NutritionStatus,
-		Nutrition:       nutritionData,
+		Description:     recipeDescription,
 		IsPublic:        dbRecipe.IsPublic,
+		Ingredients:     dbRecipe.Ingredients,
+		Instructions:    dbRecipe.Instructions,
+		Nutrition:       dbRecipe.Nutrition,
+		NutritionStatus: dbRecipe.NutritionStatus,
 	}
 
-	cfg.respondWithJSON(w, http.StatusCreated, recipe)
-}
-
-func (cfg *apiConfig) handleRecipeGetAllPublic(w http.ResponseWriter, r *http.Request) {
-	var limit, page int32
-
-	limit = 10
-	page = 1
-
-	offset := (page - 1) * limit
-
-	getAllRecipeParams := database.GetAllPublicRecipesParams{
-		Limit:  limit,
-		Offset: offset,
-	}
-	dbRows, err := cfg.db.GetAllPublicRecipes(r.Context(), getAllRecipeParams)
-	if err != nil {
-		cfg.log.Warn("error fetching recipes", slog.String("error", err.Error()))
-		cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
-		return
-	}
-
-	recipes := make([]RecipeWithAuthor, len(dbRows))
-	for i, row := range dbRows {
-		var description *string
-		if row.Description.Valid {
-			description = &row.Description.String
-		}
-
-		ingredients, err := UnmarshalJSONB[[]Ingredient](row.Ingredients)
-		if err != nil {
-			cfg.log.Warn("error unmarshalling ingredients", slog.String("error", err.Error()))
-			cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
-			return
-		}
-
-		instructions, err := UnmarshalJSONB[[]string](row.Instructions)
-		if err != nil {
-			cfg.log.Warn("error unmarshalling instructions", slog.String("error", err.Error()))
-			cfg.respondWithError(w, http.StatusInternalServerError, "internal server error")
-			return
-		}
-
-		var nutrition json.RawMessage
-		if row.Nutrition != nil {
-			nutrition = *row.Nutrition
-		}
-
-		recipes[i] = RecipeWithAuthor{
-			ID:              row.ID,
-			AuthorName:      row.AuthorName,
-			CreatedAt:       row.CreatedAt,
-			UpdatedAt:       row.UpdatedAt,
-			Title:           row.Title,
-			Description:     description,
-			Ingredients:     ingredients,
-			Instructions:    instructions,
-			Nutrition:       nutrition,
-			NutritionStatus: row.NutritionStatus,
-			IsPublic:        row.IsPublic,
-		}
-	}
-
-	cfg.respondWithJSON(w, http.StatusOK, recipes)
+	cfg.respondWithJSON(w, http.StatusCreated, recipeResponse)
 }

@@ -8,10 +8,11 @@ package database
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
+	models "grubby/internal/models"
 )
 
 const completeNutritionCalculation = `-- name: CompleteNutritionCalculation :one
@@ -25,7 +26,7 @@ RETURNING id, user_id, created_at, updated_at, title, description, is_public, in
 `
 
 type CompleteNutritionCalculationParams struct {
-	Nutrition *json.RawMessage
+	Nutrition *models.Nutrition
 	ID        uuid.UUID
 }
 
@@ -40,9 +41,9 @@ func (q *Queries) CompleteNutritionCalculation(ctx context.Context, arg Complete
 		&i.Title,
 		&i.Description,
 		&i.IsPublic,
-		&i.Ingredients,
+		pq.Array(&i.Ingredients),
 		&i.Nutrition,
-		&i.Instructions,
+		pq.Array(&i.Instructions),
 		&i.NutritionStatus,
 		&i.DeletedAt,
 	)
@@ -72,8 +73,8 @@ type CreateRecipeParams struct {
 	Title        string
 	Description  sql.NullString
 	IsPublic     bool
-	Ingredients  json.RawMessage
-	Instructions json.RawMessage
+	Ingredients  []models.Ingredient
+	Instructions []models.Instruction
 }
 
 func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Recipe, error) {
@@ -83,8 +84,8 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 		arg.Title,
 		arg.Description,
 		arg.IsPublic,
-		arg.Ingredients,
-		arg.Instructions,
+		pq.Array(arg.Ingredients),
+		pq.Array(arg.Instructions),
 	)
 	var i Recipe
 	err := row.Scan(
@@ -95,9 +96,9 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (Rec
 		&i.Title,
 		&i.Description,
 		&i.IsPublic,
-		&i.Ingredients,
+		pq.Array(&i.Ingredients),
 		&i.Nutrition,
-		&i.Instructions,
+		pq.Array(&i.Instructions),
 		&i.NutritionStatus,
 		&i.DeletedAt,
 	)
@@ -143,12 +144,12 @@ type GetAllPublicRecipesRow struct {
 	Title           string
 	Description     sql.NullString
 	IsPublic        bool
-	Ingredients     json.RawMessage
-	Instructions    json.RawMessage
+	Ingredients     []models.Ingredient
+	Instructions    []models.Instruction
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       sql.NullTime
-	Nutrition       *json.RawMessage
+	Nutrition       *models.Nutrition
 	NutritionStatus string
 	AuthorName      string
 }
@@ -168,8 +169,8 @@ func (q *Queries) GetAllPublicRecipes(ctx context.Context, arg GetAllPublicRecip
 			&i.Title,
 			&i.Description,
 			&i.IsPublic,
-			&i.Ingredients,
-			&i.Instructions,
+			pq.Array(&i.Ingredients),
+			pq.Array(&i.Instructions),
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -231,12 +232,12 @@ type GetAllPublicRecipesByOwnerIDRow struct {
 	Title           string
 	Description     sql.NullString
 	IsPublic        bool
-	Ingredients     json.RawMessage
-	Instructions    json.RawMessage
+	Ingredients     []models.Ingredient
+	Instructions    []models.Instruction
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       sql.NullTime
-	Nutrition       *json.RawMessage
+	Nutrition       *models.Nutrition
 	NutritionStatus string
 	AuthorName      string
 }
@@ -256,8 +257,8 @@ func (q *Queries) GetAllPublicRecipesByOwnerID(ctx context.Context, arg GetAllPu
 			&i.Title,
 			&i.Description,
 			&i.IsPublic,
-			&i.Ingredients,
-			&i.Instructions,
+			pq.Array(&i.Ingredients),
+			pq.Array(&i.Instructions),
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -318,12 +319,12 @@ type GetAllRecipesByOwnerIDRow struct {
 	Title           string
 	Description     sql.NullString
 	IsPublic        bool
-	Ingredients     json.RawMessage
-	Instructions    json.RawMessage
+	Ingredients     []models.Ingredient
+	Instructions    []models.Instruction
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       sql.NullTime
-	Nutrition       *json.RawMessage
+	Nutrition       *models.Nutrition
 	NutritionStatus string
 	AuthorName      string
 }
@@ -343,8 +344,8 @@ func (q *Queries) GetAllRecipesByOwnerID(ctx context.Context, arg GetAllRecipesB
 			&i.Title,
 			&i.Description,
 			&i.IsPublic,
-			&i.Ingredients,
-			&i.Instructions,
+			pq.Array(&i.Ingredients),
+			pq.Array(&i.Instructions),
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
@@ -388,9 +389,9 @@ func (q *Queries) GetRecipeByID(ctx context.Context, arg GetRecipeByIDParams) (R
 		&i.Title,
 		&i.Description,
 		&i.IsPublic,
-		&i.Ingredients,
+		pq.Array(&i.Ingredients),
 		&i.Nutrition,
-		&i.Instructions,
+		pq.Array(&i.Instructions),
 		&i.NutritionStatus,
 		&i.DeletedAt,
 	)
@@ -458,8 +459,8 @@ type UpdateRecipeFullParams struct {
 	Title        string
 	Description  sql.NullString
 	IsPublic     bool
-	Ingredients  json.RawMessage
-	Instructions json.RawMessage
+	Ingredients  []models.Ingredient
+	Instructions []models.Instruction
 	ID           uuid.UUID
 	UserID       uuid.NullUUID
 }
@@ -469,8 +470,8 @@ func (q *Queries) UpdateRecipeFull(ctx context.Context, arg UpdateRecipeFullPara
 		arg.Title,
 		arg.Description,
 		arg.IsPublic,
-		arg.Ingredients,
-		arg.Instructions,
+		pq.Array(arg.Ingredients),
+		pq.Array(arg.Instructions),
 		arg.ID,
 		arg.UserID,
 	)
@@ -483,9 +484,9 @@ func (q *Queries) UpdateRecipeFull(ctx context.Context, arg UpdateRecipeFullPara
 		&i.Title,
 		&i.Description,
 		&i.IsPublic,
-		&i.Ingredients,
+		pq.Array(&i.Ingredients),
 		&i.Nutrition,
-		&i.Instructions,
+		pq.Array(&i.Instructions),
 		&i.NutritionStatus,
 		&i.DeletedAt,
 	)
@@ -518,9 +519,9 @@ func (q *Queries) UpdateRecipeVisibility(ctx context.Context, arg UpdateRecipeVi
 		&i.Title,
 		&i.Description,
 		&i.IsPublic,
-		&i.Ingredients,
+		pq.Array(&i.Ingredients),
 		&i.Nutrition,
-		&i.Instructions,
+		pq.Array(&i.Instructions),
 		&i.NutritionStatus,
 		&i.DeletedAt,
 	)

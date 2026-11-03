@@ -7,19 +7,22 @@ sql:
       go:
         out: "internal/database"
         overrides:
-          - db_type: "jsonb"
-            go_type: "encoding/json.RawMessage"
-          - db_type: "jsonb"
-            nullable: true
+          - column: "recipes.ingredients"
             go_type:
-              import: "encoding/json"
-              type: "RawMessage"
-              pointer: true
-          - db_type: "json"
-            go_type: "encoding/json.RawMessage"
-          - db_type: "json"
-            nullable: true
+              import: "grubby/internal/models"
+              package: "models"
+              type: "Ingredient"
+              slice: true
+          - column: "recipes.instructions"
             go_type:
-              import: "encoding/json"
-              type: "RawMessage"
+              import: "grubby/internal/models"
+              package: "models"
+              type: "Instruction"
+              slice: true
+          - column: "recipes.nutrition"
+            go_type:
+              import: "grubby/internal/models"
+              package: "models"
+              type: "Nutrition"
+              slice: false
               pointer: true
